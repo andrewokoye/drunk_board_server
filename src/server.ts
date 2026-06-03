@@ -2,6 +2,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import { Player, Room } from "./interfaces";
+
 const app = express();
 const port = process.env.PORT || 3001;
 
@@ -18,6 +19,7 @@ const io = new Server(httpServer, {
 const rooms: Record<number, Room> = {};
 const roomCodes: Record<string, number> = {};
 let nextRoomId = 1;
+const roomCleanupTimers: Record<number, NodeJS.Timeout> = {};
 
 
 app.get("/", (_req, res) => {
@@ -64,6 +66,12 @@ io.on("connection", (socket) => {
     }
 
     const room = rooms[roomId];
+
+    // Cancel cleanup timer if exists
+    if (roomCleanupTimers[roomId]) {
+      clearTimeout(roomCleanupTimers[roomId]);
+      delete roomCleanupTimers[roomId];
+    }
 
     // Check if username already exists (reconnect)
     const existing = room.players.find(p => p.username === username);
@@ -115,6 +123,19 @@ io.on("connection", (socket) => {
         player.disconnected = true;
 
         io.to(room.roomCode).emit("playersList", room.players);
+
+        const allDisconnected = room.players.every(p => p.disconnected);
+
+        if (allDisconnected) {
+          roomCleanupTimers[roomId] = setTimeout(() => {
+            console.log(`Grace period expired. Deleting room ${room.roomCode}`);
+
+            delete roomCodes[room.roomCode];
+            delete rooms[roomId];
+            delete roomCleanupTimers[roomId];
+
+          }, 20000); // 20 seconds
+        }
       }
     }
   });
