@@ -71,7 +71,7 @@ io.on("connection", (socket) => {
     disconnected: false
   }];
 
-    socket.emit("roomCreated", { roomId: roomCode, roomCode });
+    socket.emit("roomCreated", { roomCode });
   });
 
 
@@ -116,7 +116,7 @@ io.on("connection", (socket) => {
     }));
 
     io.to(roomCode).emit("playerJoined", playerObjects);
-    socket.emit("roomJoined", { roomId: roomCode, roomCode });
+    socket.emit("roomJoined", { roomCode });
   });
 
 
