@@ -63,16 +63,31 @@ io.on("connection", (socket) => {
       socket_id: socket.id
     });
 
+    // Add player
+    const { data: game } = await supabase
+      .from("games")
+      .select("*")
+      .eq("room_id", roomCode)
+      .single();
+
+    const updatedPlayers = game.players.includes(username)
+      ? game.players
+      : [...game.players, username];
+
+    await supabase
+      .from("games")
+      .update({ players: updatedPlayers })
+      .eq("room_id", roomCode);
+
+    socket.join(roomCode);
+
     // Emit structured player list
-    const playerObjects = existing.players.map((username : string) => ({
+    const playerObjects = updatedPlayers.players.map((username : string) => ({
       username: username,
       disconnected: false
     }));
 
     io.to(roomCode).emit("playerJoined", playerObjects);
-
-    socket.join(roomCode);
-
     socket.emit("roomCreated", { roomCode });
   });
 
