@@ -54,7 +54,22 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // add creator as a connected player
+  await supabase
+    .from("connected_players")
+    .insert({
+      room_id: roomCode,
+      username,
+      socket_id: socket.id
+    });
+
     socket.join(roomCode);
+
+    // Emit structured player list
+  const playerObjects = [{
+    username,
+    disconnected: false
+  }];
 
     socket.emit("roomCreated", { roomId: roomCode, roomCode });
   });
@@ -179,7 +194,7 @@ io.on("connection", (socket) => {
 
           await supabase.from("games").delete().eq("room_id", room_id);
         }
-      }, 20000); // 20 seconds
+      }, 30000); // 30 seconds
     }
 
     // Notify clients (optional)
