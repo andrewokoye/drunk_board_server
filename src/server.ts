@@ -94,7 +94,13 @@ io.on("connection", (socket) => {
 
     socket.join(roomCode);
 
-    io.to(roomCode).emit("playerJoined", updatedPlayers);
+    // Emit structured player objects
+    const playerObjects = updatedPlayers.map((name : string) => ({
+      username: name,
+      disconnected: false
+    }));
+
+    io.to(roomCode).emit("playerJoined", playerObjects);
     socket.emit("roomJoined", { roomId: roomCode, roomCode });
   });
 
@@ -110,7 +116,12 @@ io.on("connection", (socket) => {
 
     if (!game) return;
 
-    socket.emit("playersList", game.players);
+    const playerObjects = game.players.map((name : string) => ({
+      username: name,
+      disconnected: false
+    }));
+
+    socket.emit("playersList", playerObjects);
   });
 
 
