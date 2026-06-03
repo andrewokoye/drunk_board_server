@@ -55,7 +55,7 @@ io.on("connection", (socket) => {
     }
 
     // add creator as a connected player
-  await supabase
+    await supabase
     .from("connected_players")
     .insert({
       room_id: roomCode,
@@ -63,13 +63,15 @@ io.on("connection", (socket) => {
       socket_id: socket.id
     });
 
-    socket.join(roomCode);
-
     // Emit structured player list
-  const playerObjects = [{
-    username,
-    disconnected: false
-  }];
+    const playerObjects = existing.players.map((username : string) => ({
+      username: username,
+      disconnected: false
+    }));
+
+    io.to(roomCode).emit("playerJoined", playerObjects);
+
+    socket.join(roomCode);
 
     socket.emit("roomCreated", { roomCode });
   });
