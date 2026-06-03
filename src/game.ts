@@ -1,2 +1,0 @@
-// src/game.ts
-export {};

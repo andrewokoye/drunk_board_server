@@ -1,2 +1,0 @@
-// src/rooms.ts
-export {};
