@@ -2,6 +2,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import { Player, Room } from "./interfaces";
+import { supabase } from "./lib/supabase";
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -15,13 +16,6 @@ const io = new Server(httpServer, {
   }
 });
 
-// In-memory room storage
-const rooms: Record<number, Room> = {};
-const roomCodes: Record<string, number> = {};
-let nextRoomId = 1;
-const roomCleanupTimers: Record<number, NodeJS.Timeout> = {};
-
-
 app.get("/", (_req, res) => {
   res.send("Tipsy Land server is running");
 });
@@ -34,122 +28,180 @@ io.on("connection", (socket) => {
   });
 
   // CREATE ROOM
-  socket.on("createRoom", ({ roomCode, username }) => {
-    if (roomCodes[roomCode]) {
+  socket.on("createRoom", async ({ roomCode, username }) => {
+    // Check if room exists
+    const { data: existing } = await supabase
+      .from("games")
+      .select("*")
+      .eq("room_id", roomCode)
+      .single();
+
+    if (existing) {
       socket.emit("roomError", "Room already exists");
       return;
     }
 
-    const roomId = nextRoomId++;
-    roomCodes[roomCode] = roomId;
+    // Create room in Supabase
+    const { error } = await supabase
+      .from("games")
+      .insert({
+        room_id: roomCode,
+        players: [username],
+        status: "lobby"
+      });
 
-    rooms[roomId] = {
-      roomId,
-      roomCode,
-      players: [
-        { username, socketId: socket.id, disconnected: false }
-      ]
-    };
+    if (error) {
+      socket.emit("roomError", "Could not create room");
+      return;
+    }
 
     socket.join(roomCode);
 
-    socket.emit("roomCreated", { roomId, roomCode });
+    socket.emit("roomCreated", { roomId: roomCode, roomCode });
   });
 
 
   // JOIN ROOM
-  socket.on("joinRoom", ({ roomCode, username }) => {
-    const roomId = roomCodes[roomCode];
-    if (!roomId) {
+  socket.on("joinRoom", async ({ roomCode, username }) => {
+    const { data: game } = await supabase
+      .from("games")
+      .select("*")
+      .eq("room_id", roomCode)
+      .single();
+
+    if (!game) {
       socket.emit("roomError", "Room does not exist");
       return;
     }
 
-    const room = rooms[roomId];
+    // Add player if not already in list
+    const updatedPlayers = game.players.includes(username)
+      ? game.players
+      : [...game.players, username];
 
-    // Cancel cleanup timer if exists
-    if (roomCleanupTimers[roomId]) {
-      clearTimeout(roomCleanupTimers[roomId]);
-      delete roomCleanupTimers[roomId];
-    }
+    await supabase
+      .from("games")
+      .update({ players: updatedPlayers })
+      .eq("room_id", roomCode);
 
-    // Check if username already exists (reconnect)
-    const existing = room.players.find(p => p.username === username);
-
-    if (existing) {
-      existing.socketId = socket.id;
-      existing.disconnected = false;
-    } else {
-      room.players.push({
+    // Add to connected players table
+    await supabase
+      .from("connected_players")
+      .insert({
+        room_id: roomCode,
         username,
-        socketId: socket.id,
-        disconnected: false
+        socket_id: socket.id
       });
-    }
 
     socket.join(roomCode);
 
-    io.to(roomCode).emit("playerJoined", room.players);
-    socket.emit("roomJoined", { roomId, roomCode });
+    io.to(roomCode).emit("playerJoined", updatedPlayers);
+    socket.emit("roomJoined", { roomId: roomCode, roomCode });
   });
+
 
 
   // LIST PLAYERS
-  socket.on("listPlayers", (roomId) => {
-    const room = rooms[roomId];
-    if (!room) return;
+  socket.on("listPlayers", async (roomCode) => {
+    const { data: game } = await supabase
+      .from("games")
+      .select("players")
+      .eq("room_id", roomCode)
+      .single();
 
-    socket.emit("playersList", room.players);
+    if (!game) return;
+
+    socket.emit("playersList", game.players);
   });
 
-  // START GAME
-  socket.on("startGame", (roomId) => {
-    const room = rooms[roomId];
-    if (!room) return;
 
-    io.to(room.roomCode).emit("gameStarted", {
-      roomId,
-      players: room.players
-    });
+  // START GAME
+  socket.on("startGame", async (roomCode) => {
+    await supabase
+      .from("games")
+      .update({ status: "started" })
+      .eq("room_id", roomCode);
+
+    const { data: game } = await supabase
+      .from("games")
+      .select("*")
+      .eq("room_id", roomCode)
+      .single();
+
+    io.to(roomCode).emit("gameStarted", game);
   });
 
   // HANDLE DISCONNECT
-  socket.on("disconnect", () => {
-    for (const roomId in rooms) {
-      const room = rooms[roomId];
-      const player = room.players.find(p => p.socketId === socket.id);
+  socket.on("disconnect", async () => {
+    // Find which room this socket belonged to
+    const { data: entry } = await supabase
+      .from("connected_players")
+      .select("*")
+      .eq("socket_id", socket.id)
+      .single();
 
-      if (player) {
-        player.disconnected = true;
+    if (!entry) return;
 
-        io.to(room.roomCode).emit("playersList", room.players);
+    const { room_id, username } = entry;
 
-        const allDisconnected = room.players.every(p => p.disconnected);
+    // Remove from connected players
+    await supabase
+      .from("connected_players")
+      .delete()
+      .eq("socket_id", socket.id);
 
-        if (allDisconnected) {
-          roomCleanupTimers[roomId] = setTimeout(() => {
-            console.log(`Grace period expired. Deleting room ${room.roomCode}`);
+    // Check if room is now empty
+    const { data: stillConnected } = await supabase
+      .from("connected_players")
+      .select("*")
+      .eq("room_id", room_id);
 
-            delete roomCodes[room.roomCode];
-            delete rooms[roomId];
-            delete roomCleanupTimers[roomId];
+    if (stillConnected && stillConnected.length === 0) {
+      // Start grace timer
+      setTimeout(async () => {
+        const { data: checkAgain } = await supabase
+          .from("connected_players")
+          .select("*")
+          .eq("room_id", room_id);
 
-          }, 20000); // 20 seconds
+        if (checkAgain && checkAgain.length === 0) {
+          console.log(`Deleting room ${room_id}`);
+
+          await supabase.from("games").delete().eq("room_id", room_id);
         }
-      }
+      }, 20000); // 20 seconds
     }
+
+    // Notify clients (optional)
+    io.to(room_id).emit("playerDisconnected", username);
   });
 
+
   // REMOVE PLAYER (kick or leave)
-  socket.on("removePlayer", ({ roomId, username }) => {
-    const room = rooms[roomId];
-    if (!room) return;
+  socket.on("removePlayer", async ({ roomCode, username }) => {
+    const { data: game } = await supabase
+      .from("games")
+      .select("players")
+      .eq("room_id", roomCode)
+      .single();
 
-    // Remove the player
-    room.players = room.players.filter(p => p.username !== username);
+    if (!game) return;
 
-    // Broadcast updated list
-    io.to(room.roomCode).emit("playersList", room.players);
+    const updatedPlayers = game.players.filter((p : string) => p !== username);
+
+    await supabase
+      .from("games")
+      .update({ players: updatedPlayers })
+      .eq("room_id", roomCode);
+
+    // Remove from connected players
+    await supabase
+      .from("connected_players")
+      .delete()
+      .eq("room_id", roomCode)
+      .eq("username", username);
+
+    io.to(roomCode).emit("playersList", updatedPlayers);
   });
 
 
