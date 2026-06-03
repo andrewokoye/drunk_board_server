@@ -82,10 +82,11 @@ io.on("connection", (socket) => {
     socket.join(roomCode);
 
     // Emit structured player list
-    const playerObjects = updatedPlayers.players.map((username : string) => ({
-      username: username,
+    const playerObjects = updatedPlayers.map((username: string) => ({
+      username,
       disconnected: false
     }));
+
 
     io.to(roomCode).emit("playerJoined", playerObjects);
     socket.emit("roomCreated", { roomCode });
