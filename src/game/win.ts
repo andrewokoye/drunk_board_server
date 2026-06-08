@@ -26,9 +26,9 @@ export async function handleWin(
 
   io.to(roomCode).emit("gameWon", {
     winnerId,
-    winnerName: winner.name,
+    winnerName: winner.username,
     finalPlayers: players
   });
 
-  console.log(`Game ${roomCode} finished — winner: ${winner.name}`);
+  console.log(`Game ${roomCode} finished — winner: ${winner.username}`);
 }

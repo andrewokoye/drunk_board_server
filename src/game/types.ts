@@ -1,6 +1,6 @@
 export type GamePlayer = {
   id: string;          // socket.id or your own playerId
-  name: string;        // username
+  username: string;        // username
   position: number;    // tile index
   tilesCompleted: number; // how many tiles/cards they’ve resolved
   skips: number;       // how many skip turns they have queued

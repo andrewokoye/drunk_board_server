@@ -76,10 +76,11 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
     socket.join(roomCode);
 
     // Emit structured player list
-    const playerObjects = updatedPlayers.map((username: string) => ({
-      username,
+    const playerObjects = updatedPlayers.map((p: GamePlayer) => ({
+      username: p.username,
       disconnected: false
     }));
+
 
 
     io.to(roomCode).emit("playerJoined", playerObjects);
@@ -101,9 +102,19 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
     }
 
     // Add player if not already in list
-    const updatedPlayers = game.players.includes(username)
-      ? game.players
-      : [...game.players, username];
+    const updatedPlayers = game.players.some((p: any) => p.username === username)
+    ? game.players
+    : [
+        ...game.players,
+        {
+          id: socket.id,
+          username,
+          position: 0,
+          tilesCompleted: 0,
+          skips: 0
+        }
+      ];
+
 
     await supabase
       .from("games")
@@ -122,10 +133,11 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
     socket.join(roomCode);
 
     // Emit structured player objects
-    const playerObjects = updatedPlayers.map((name : string) => ({
-      username: name,
+    const playerObjects = updatedPlayers.map((p: GamePlayer) => ({
+      username: p.username,
       disconnected: false
     }));
+
 
     io.to(roomCode).emit("playerJoined", playerObjects);
     socket.emit("roomJoined", { roomCode });
@@ -143,10 +155,11 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
 
     if (!game) return;
 
-    const playerObjects = game.players.map((name : string) => ({
-      username: name,
+    const playerObjects = game.players.map((p: GamePlayer) => ({
+      username: p.username,
       disconnected: false
     }));
+
 
     socket.emit("playersList", playerObjects);
   });
@@ -245,7 +258,10 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
 
     if (!game) return;
 
-    const updatedPlayers = game.players.filter((p : string) => p !== username);
+    const updatedPlayers = game.players.filter(
+      (p: GamePlayer) => p.username !== username
+    );
+
 
     await supabase
       .from("games")

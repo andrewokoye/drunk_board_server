@@ -31,7 +31,7 @@ export async function endTurn(
   io.to(roomCode).emit("turnChanged", nextPlayerId);
   io.to(roomCode).emit("gameStateUpdated", {
     ...state,
-    currentTurn: nextPlayerId,
+    current_turn: nextPlayerId,
     players
   });
 }
