@@ -6,10 +6,6 @@ export function registerSocketHandlers(io: Server) {
   io.on("connection", (socket: Socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    socket.emit("connected", {
-      message: "You are connected to Tipsy Land server"
-    });
-
     registerLobbyHandlers(io, socket);
     registerGameHandlers(io, socket);
   });
