@@ -8,10 +8,12 @@ export type GamePlayer = {
 
 export type GameState = {
   room_id: string;
+  host_id: string;       // NEW
   status: "lobby" | "playing" | "finished";
-  current_turn: string | null; // playerId
+  current_turn: string | null;
   players: GamePlayer[];
 };
+
 
 export type TileType = "normal" | "drink" | "challenge" | "moveForward" | "moveBack" | "skipTurn" | "finish";
 

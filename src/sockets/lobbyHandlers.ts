@@ -23,6 +23,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
       .from("games")
       .insert({
         room_id: roomCode,
+        host_id: socket.id,  
         players: [
         {
           id: socket.id,
@@ -117,9 +118,13 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
 
 
     await supabase
-      .from("games")
-      .update({ players: updatedPlayers })
-      .eq("room_id", roomCode);
+    .from("games")
+    .update({
+      players: updatedPlayers,
+      host_id: game.host_id   // PRESERVE HOST
+    })
+    .eq("room_id", roomCode);
+
 
     // Add to connected players table
     await supabase
@@ -182,10 +187,16 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
       return;
     }
 
+    if (socket.id !== game.host_id) {
+      socket.emit("gameError", "Only the host can start the game");
+      return;
+    }
+
     const firstPlayerId = players[0].id;
 
     const updated: GameState = {
       room_id: roomCode,
+      host_id: game.host_id,
       status: "playing",
       current_turn: firstPlayerId,
       players,
@@ -264,9 +275,13 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
 
 
     await supabase
-      .from("games")
-      .update({ players: updatedPlayers })
-      .eq("room_id", roomCode);
+    .from("games")
+    .update({
+      players: updatedPlayers,
+      host_id: game.players.host_id
+    })
+    .eq("room_id", roomCode);
+
 
     // Remove from connected players
     await supabase

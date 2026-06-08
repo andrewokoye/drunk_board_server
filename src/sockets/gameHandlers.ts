@@ -6,6 +6,13 @@ import { endTurn } from "../game/turn";
 
 export function registerGameHandlers(io: Server, socket: Socket) {
 
+  //REQUEST GAME STATE
+  socket.on("requestGameState", async ({ roomCode }) => {
+    const game = await loadGame(roomCode);
+    if (game) socket.emit("gameStateUpdated", game);
+  });
+
+
   //
   // ROLL DICE
   //
