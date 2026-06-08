@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { supabase } from "../lib/supabase";
-import { GamePlayer } from "../game/types";
+import { GamePlayer, GameState } from "../game/types";
 
 export function registerLobbyHandlers(io: Server, socket: Socket) {
 
@@ -23,7 +23,14 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
       .from("games")
       .insert({
         room_id: roomCode,
-        players: [username],
+        players: [
+        {
+          id: socket.id,
+          username,
+          position: 0,
+          tilesCompleted: 0,
+          skips: 0
+        }],
         status: "lobby"
       });
 
@@ -48,9 +55,18 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
       .eq("room_id", roomCode)
       .single();
 
-    const updatedPlayers = game.players.includes(username)
-      ? game.players
-      : [...game.players, username];
+    const updatedPlayers = game.players.some((p: any) => p.username === username)
+  ? game.players
+  : [
+      ...game.players,
+      {
+        id: socket.id,
+        username,
+        position: 0,
+        tilesCompleted: 0,
+        skips: 0
+      }
+    ];
 
     await supabase
       .from("games")
@@ -155,11 +171,13 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
 
     const firstPlayerId = players[0].id;
 
-    const updated = {
+    const updated: GameState = {
+      room_id: roomCode,
       status: "playing",
       current_turn: firstPlayerId,
-      players
+      players,
     };
+
 
     await supabase
       .from("games")
