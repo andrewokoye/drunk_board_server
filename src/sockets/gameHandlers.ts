@@ -40,7 +40,7 @@ export function registerGameHandlers(io: Server, socket: Socket) {
   });
 
   //
-  // CHALLENGE RESULT
+  // TILE RESULT
   //
   socket.on("challengeResult", async ({ roomCode }: { roomCode: string }) => {
     const game = await loadGame(roomCode);
@@ -48,5 +48,13 @@ export function registerGameHandlers(io: Server, socket: Socket) {
 
     await endTurn(roomCode, game, socket.id);
   });
+
+  socket.on("tileEffectComplete", async ({ roomCode }) => {
+    const game = await loadGame(roomCode);
+    if (!game) return;
+
+    await endTurn(roomCode, game, socket.id);
+  });
+
 
 }
