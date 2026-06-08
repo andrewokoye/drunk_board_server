@@ -14,13 +14,28 @@ export type GameState = {
   players: GamePlayer[];
 };
 
+export type TileType =
+  | "drink"
+  | "neverHaveIEver"
+  | "mostLikelyTo"
+  | "truth"
+  | "doOrDrink"
+  | "spicyQuestion"
+  | "story"
+  | "pickSomeone"
+  | "moveForward"
+  | "moveBack"
+  | "skipTurn"
+  | "finish";
 
-export type TileType = "normal" | "drink" | "challenge" | "moveForward" | "moveBack" | "skipTurn" | "finish";
 
-export interface TileDef {
-  id: string;
+export interface BoardTile {
+
+  position: number;
+
   type: TileType;
-  value?: number;
-  challengeId?: string;
-}
 
+  value?: number;
+
+  prompt?: string;
+}
