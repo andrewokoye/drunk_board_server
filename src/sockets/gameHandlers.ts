@@ -42,7 +42,7 @@ export function registerGameHandlers(io: Server, socket: Socket) {
   //
   // TILE RESULT
   //
-  socket.on("challengeResult", async ({ roomCode }: { roomCode: string }) => {
+  socket.on("challengeResult", async ({ roomCode }) => {
     const game = await loadGame(roomCode);
     if (!game || game.current_turn !== socket.id) return;
     await endTurn(roomCode, game, socket.id);
