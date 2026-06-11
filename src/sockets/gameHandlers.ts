@@ -44,15 +44,13 @@ export function registerGameHandlers(io: Server, socket: Socket) {
   //
   socket.on("challengeResult", async ({ roomCode }: { roomCode: string }) => {
     const game = await loadGame(roomCode);
-    if (!game) return;
-
+    if (!game || game.current_turn !== socket.id) return;
     await endTurn(roomCode, game, socket.id);
   });
 
   socket.on("tileEffectComplete", async ({ roomCode }) => {
     const game = await loadGame(roomCode);
-    if (!game) return;
-
+    if (!game || game.current_turn !== socket.id) return; 
     await endTurn(roomCode, game, socket.id);
   });
 

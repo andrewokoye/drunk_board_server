@@ -28,6 +28,7 @@ export async function endTurn(
     })
     .eq("room_id", roomCode);
 
+  io.to(roomCode).emit("clearEffects");
   io.to(roomCode).emit("turnChanged", nextPlayerId);
   io.to(roomCode).emit("gameStateUpdated", {
     ...state,
